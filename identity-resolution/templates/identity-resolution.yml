@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Mappings:
+  S3Buckets:
+    us-west-2:
+      bucket: aws-admartech-samples-us-west-2
+    us-east-1:
+      bucket: aws-admartech-samples
+    us-east-2:
+      bucket: aws-admartech-samples-us-east-2
+    eu-west-1:
+      bucket: aws-admartech-samples-eu-west-1
+
+  Constants:
+    S3Keys:
+      neptuneNotebooks: /identity-resolution/notebooks|identity-resolution/*
+      irdata: /identity-resolution/data/
+      bulkLoadStack: /identity-resolution/templates/bulk-load-stack.yaml
+
+  #------------------------------------------------------------------------------#
+  # RESOURCES
+  #------------------------------------------------------------------------------#
+Resources:
+# ---------- CREATING NEPTUNE CLUSTER FROM SNAPSHOT ----------
+  NeptuneBaseStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/aws-neptune-customer-samples/v2/cloudformation-templates/neptune-base-stack.json
+      Parameters:
+        NeptuneQueryTimeout: '300000'
+        DbInstanceType: db.r5.12xlarge
+      TimeoutInMinutes: '360'
+
+# ---------- SETTING UP SAGEMAKER NOTEBOOK INSTANCES ----------
+  SageMakerNeptuneStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/aws-neptune-customer-samples/neptune-sagemaker/cloudformation-templates/neptune-sagemaker/neptune-sagemaker-nested-stack.json
+      Parameters:
+        NotebookInstanceType: ml.m4.xlarge
+        NeptuneClusterEndpoint:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.DBClusterEndpoint
+        NeptuneReaderEndpoint:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.DBClusterReadEndpoint
+        NeptuneClusterPort:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.DBClusterPort
+        NeptuneClusterVpc:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.VPC
+        NeptuneClusterSubnetId:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.PublicSubnet1
+        NeptuneLoadFromS3RoleArn:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.NeptuneLoadFromS3IAMRoleArn
+        NeptuneClientSecurityGroup: ''
+        NeptuneClusterResourceId:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.DBClusterResourceId
+        NotebookContentS3Locations: !Join
+                                          - ''
+                                          - - 's3://'
+                                            - !FindInMap
+                                              - S3Buckets
+                                              - !Ref 'AWS::Region'
+                                              - bucket
+                                            - !FindInMap
+                                              - Constants
+                                              - S3Keys
+                                              - neptuneNotebooks
+      TimeoutInMinutes: '60'
+
+# ---------- CONNECTING IAM ROLE TO NEPTUNE CLUSTER ----------
+  AddIamRoleToNeptuneStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/aws-neptune-customer-samples/neptune-sagemaker/cloudformation-templates/common/add-iam-role-to-neptune.json
+      Parameters:
+        DBClusterId:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.DBClusterId
+        NeptuneLoadFromS3IAMRoleArn:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.NeptuneLoadFromS3IAMRoleArn
+      TimeoutInMinutes: '60'
+
+# --------- LOAD DATA INTO NEPTUNE ---------
+
+  NeptuneBulkLoadStack:
+    DependsOn:
+     - NeptuneBaseStack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+                    - ''
+                    - - 'https://s3.'
+                      - !Ref 'AWS::Region'
+                      - '.amazonaws.com/'
+                      - !FindInMap
+                        - S3Buckets
+                        - !Ref 'AWS::Region'
+                        - bucket
+                      - !FindInMap
+                        - Constants
+                        - S3Keys
+                        - bulkLoadStack
+      Parameters:
+        bulkloadNeptuneEndpoint:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.DBClusterEndpoint
+        bulkloadNeptuneData: !Join
+                          - ''
+                          - - 's3://'
+                            - !FindInMap
+                              - S3Buckets
+                              - !Ref 'AWS::Region'
+                              - bucket
+                            - !FindInMap
+                              - Constants
+                              - S3Keys
+                              - irdata
+        bulkloadNeptuneIAMRole:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.NeptuneLoadFromS3IAMRoleArn
+        bulkloadNeptuneSecurityGroup:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.NeptuneSG
+        bulkloadSubnet1:
+          Fn::GetAtt:
+          - NeptuneBaseStack
+          - Outputs.PrivateSubnet1
+        bulkloadBucket: !FindInMap
+                          - S3Buckets
+                          - !Ref 'AWS::Region'
+                          - bucket
+          
+
+  #------------------------------------------------------------------------------#
+  # OUTPUTS
+  #------------------------------------------------------------------------------#
+
+Outputs:
+  VPC:
+    Description: VPC of the Neptune Cluster
+    Value:
+      Fn::GetAtt:
+        - NeptuneBaseStack
+        - Outputs.VPC
+  PublicSubnet1:
+    Value:
+      Fn::GetAtt:
+        - NeptuneBaseStack
+        - Outputs.PublicSubnet1
+  NeptuneSG:
+    Description: Neptune Security Group
+    Value:
+      Fn::GetAtt:
+        - NeptuneBaseStack
+        - Outputs.NeptuneSG
+  SageMakerNotebook:
+    Value:
+      Fn::GetAtt:
+      - SageMakerNeptuneStack
+      - Outputs.NeptuneNotebook
+  DBClusterEndpoint:
+    Description: Master Endpoint for Neptune Cluster
+    Value:
+      Fn::GetAtt:
+      - NeptuneBaseStack
+      - Outputs.DBClusterEndpoint
+  DBInstanceEndpoint:
+    Description: Master Instance Endpoint
+    Value:
+      Fn::GetAtt:
+      - NeptuneBaseStack
+      - Outputs.DBInstanceEndpoint
+  GremlinEndpoint:
+    Description: Gremlin Endpoint for Neptune
+    Value:
+      Fn::GetAtt:
+      - NeptuneBaseStack
+      - Outputs.GremlinEndpoint
+  LoaderEndpoint:
+    Description: Loader Endpoint for Neptune
+    Value:
+      Fn::GetAtt:
+      - NeptuneBaseStack
+      - Outputs.LoaderEndpoint
+  DBClusterReadEndpoint:
+    Description: DB cluster Read Endpoint
+    Value:
+      Fn::GetAtt:
+      - NeptuneBaseStack
+      - Outputs.DBClusterReadEndpoint
