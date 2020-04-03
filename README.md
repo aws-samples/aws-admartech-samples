@@ -2,9 +2,9 @@
 
 Samples and documentation for various advertising and marketing use cases on AWS.
 
-## Sample 1: [Identity Resolution using Amazon Neptune](./identity-resolution/)
+## Sample 1: [Customer Identity Graph using Amazon Neptune](./identity-resolution/)
 
-Identity Resolution is the process of matching human identity across a set of devices used by the same person or a household of persons for the purposes of building a representative identity, or known attributes, for targeted advertising. Included in this repository is a sample solution for building an identity graph solution using Amazon Neptune, a managed graph database service on AWS.
+Customer identity graph is matching human identity across a set of devices used by the same person or a household of persons for the purposes of building a representative identity, or known attributes, for targeted advertising. Included in this repository is a sample solution for building an identity graph solution using Amazon Neptune, a managed graph database service on AWS.
 
 ## Additional Reading
 
