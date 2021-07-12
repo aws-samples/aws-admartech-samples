@@ -5,7 +5,7 @@ Mappings:
     us-west-2:
       bucket: aws-admartech-samples-us-west-2
     us-east-1:
-      bucket: aws-admartech-samples
+      bucket: aws-admartech-samples-us-east-1
     us-east-2:
       bucket: aws-admartech-samples-us-east-2
     eu-west-1:
@@ -13,7 +13,7 @@ Mappings:
 
   Constants:
     S3Keys:
-      neptuneNotebooks: /identity-resolution/notebooks|identity-resolution/*
+      neptuneNotebooks: /identity-resolution/notebooks|identity-graph/*
       irdata: /identity-resolution/data/
       bulkLoadStack: /identity-resolution/templates/bulk-load-stack.yaml
 
@@ -78,22 +78,6 @@ Resources:
                                               - Constants
                                               - S3Keys
                                               - neptuneNotebooks
-      TimeoutInMinutes: '60'
-
-# ---------- CONNECTING IAM ROLE TO NEPTUNE CLUSTER ----------
-  AddIamRoleToNeptuneStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: https://s3.amazonaws.com/aws-neptune-customer-samples/neptune-sagemaker/cloudformation-templates/common/add-iam-role-to-neptune.json
-      Parameters:
-        DBClusterId:
-          Fn::GetAtt:
-          - NeptuneBaseStack
-          - Outputs.DBClusterId
-        NeptuneLoadFromS3IAMRoleArn:
-          Fn::GetAtt:
-          - NeptuneBaseStack
-          - Outputs.NeptuneLoadFromS3IAMRoleArn
       TimeoutInMinutes: '60'
 
 # --------- LOAD DATA INTO NEPTUNE ---------
