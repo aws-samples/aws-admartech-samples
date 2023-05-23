@@ -44,8 +44,8 @@ def edges_scatter(graph):
     edge_y = []
 
     for edge in graph.edges():
-        x0, y0 = graph.node[edge[0]]["pos"]
-        x1, y1 = graph.node[edge[1]]["pos"]
+        x0, y0 = graph.nodes[edge[0]]["pos"]
+        x1, y1 = graph.nodes[edge[1]]["pos"]
         edge_x.append(x0)
         edge_x.append(x1)
         edge_x.append(None)
@@ -77,8 +77,8 @@ def edge_scatters_by_label(graph, widths=None, colors=None, dashes=None, opacity
         edge_y = []
 
         for edge in edges:
-            x0, y0 = graph.node[edge[0]]["pos"]
-            x1, y1 = graph.node[edge[1]]["pos"]
+            x0, y0 = graph.nodes[edge[0]]["pos"]
+            x1, y1 = graph.nodes[edge[1]]["pos"]
             edge_x.append(x0)
             edge_x.append(x1)
             edge_x.append(None)
@@ -104,8 +104,8 @@ def edge_scatters_by_label(graph, widths=None, colors=None, dashes=None, opacity
 def edge_annotations(graph):
     annotations = []
     for from_, to_, attr_map in graph.edges(data=True):
-        x0, y0 = graph.node[from_]["pos"]
-        x1, y1 = graph.node[to_]["pos"]
+        x0, y0 = graph.nodes[from_]["pos"]
+        x1, y1 = graph.nodes[to_]["pos"]
         x_mid, y_mid = (x0 + x1) / 2, (y0 + y1) / 2
         annotations.append(dict(
             xref="x",
@@ -133,10 +133,10 @@ def scatters_by_label(graph, attrs_to_skip, sizes=None, colors=None):
         size_list = []
 
         for node_id, _ in node_group:
-            x, y = graph.node[node_id]["pos"]
-            opacity.append(graph.node[node_id].get("opacity", 1))
+            x, y = graph.nodes[node_id]["pos"]
+            opacity.append(graph.nodes[node_id].get("opacity", 1))
             size_list.append(
-                graph.node[node_id].get("size", sizes.get(label, 10))
+                graph.nodes[node_id].get("size", sizes.get(label, 10))
             )
             node_x.append(x)
             node_y.append(y)

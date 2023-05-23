@@ -13,9 +13,10 @@ Mappings:
 
   Constants:
     S3Keys:
-      neptuneNotebooks: /identity-resolution/notebooks|identity-graph/*
+      neptuneNotebooks: /identity-resolution/notebooks/identity-graph
       irdata: /identity-resolution/data/
       bulkLoadStack: /identity-resolution/templates/bulk-load-stack.yaml
+      neptuneNotebookStack: /identity-resolution/templates/neptune-workbench-stack.yaml
 
   #------------------------------------------------------------------------------#
   # RESOURCES
@@ -32,42 +33,84 @@ Resources:
       TimeoutInMinutes: '360'
 
 # ---------- SETTING UP SAGEMAKER NOTEBOOK INSTANCES ----------
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: "sagemakerneptunepolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource:
+                  Fn::Sub: "arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:*"
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:DescribeLogStreams"
+                  - "logs:PutLogEvents"
+                  - "logs:GetLogEvents"
+                Resource:
+                  Fn::Sub: "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Effect: "Allow"
+                Action: "neptune-db:connect"
+                Resource:
+                  Fn::Sub: "arn:${AWS::Partition}:neptune-db:${AWS::Region}:${AWS::AccountId}:${NeptuneBaseStack.Outputs.DBClusterId}/*"
+              - Effect: "Allow"
+                Action:
+                  - "s3:Get*"
+                  - "s3:List*"
+                Resource:
+                  Fn::Sub: "arn:${AWS::Partition}:s3:::*"
+
   SageMakerNeptuneStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/aws-neptune-customer-samples/neptune-sagemaker/cloudformation-templates/neptune-sagemaker/neptune-sagemaker-nested-stack.json
+      TemplateURL:
+        Fn::Join: [ "",
+          [
+            https://s3.amazonaws.com/,
+            !FindInMap [ S3Buckets, Ref: 'AWS::Region', bucket ],
+            !FindInMap [ Constants, S3Keys, neptuneNotebookStack ]
+          ]
+        ]
       Parameters:
-        NotebookInstanceType: ml.m4.xlarge
+        SageMakerNotebookName: "id-graph-notebook"
+        NotebookInstanceType: ml.m5.xlarge
         NeptuneClusterEndpoint:
           Fn::GetAtt:
           - NeptuneBaseStack
           - Outputs.DBClusterEndpoint
-        NeptuneReaderEndpoint:
-          Fn::GetAtt:
-          - NeptuneBaseStack
-          - Outputs.DBClusterReadEndpoint
         NeptuneClusterPort:
           Fn::GetAtt:
           - NeptuneBaseStack
           - Outputs.DBClusterPort
-        NeptuneClusterVpc:
+        NeptuneClusterSecurityGroups:
           Fn::GetAtt:
           - NeptuneBaseStack
-          - Outputs.VPC
+          - Outputs.NeptuneSG
         NeptuneClusterSubnetId:
           Fn::GetAtt:
           - NeptuneBaseStack
           - Outputs.PublicSubnet1
-        NeptuneLoadFromS3RoleArn:
+        SageMakerNotebookRole:
           Fn::GetAtt:
-          - NeptuneBaseStack
-          - Outputs.NeptuneLoadFromS3IAMRoleArn
-        NeptuneClientSecurityGroup: ''
-        NeptuneClusterResourceId:
-          Fn::GetAtt:
-          - NeptuneBaseStack
-          - Outputs.DBClusterResourceId
-        NotebookContentS3Locations: !Join
+          - ExecutionRole
+          - Arn
+        AdditionalNotebookS3Locations: !Join
                                           - ''
                                           - - 's3://'
                                             - !FindInMap
@@ -83,8 +126,6 @@ Resources:
 # --------- LOAD DATA INTO NEPTUNE ---------
 
   NeptuneBulkLoadStack:
-    DependsOn:
-     - NeptuneBaseStack
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join

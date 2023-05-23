@@ -246,7 +246,6 @@ def compute_subgraph_pos(query_results, thank_you_page):
         thank_you_page=thank_you_page,
         max_ts_delta=300
     ):
-
         raw_graph.nodes[thank_you_page]["label"] = "thank-you-page"
 
         graph_with_pos_computed = drawing.layout(raw_graph, _custom_layout)

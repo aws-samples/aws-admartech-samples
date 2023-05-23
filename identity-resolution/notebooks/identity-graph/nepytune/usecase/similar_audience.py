@@ -116,7 +116,7 @@ def draw_referenced_subgraph(g, website_url, categories_limit=3, search_time_lim
     graph = _build_graph(average_profile, similar_audience)
 
     iabs = [n for n, params in graph.nodes(data=True) if params["label"] == "IAB"]
-    avg_iabs = [n for n in iabs if graph.node[n]["category"] in average_profile]
+    avg_iabs = [n for n in iabs if graph.nodes[n]["category"] in average_profile]
 
     graph_with_pos_computed = drawing.layout(
         graph,
@@ -132,14 +132,14 @@ def draw_referenced_subgraph(g, website_url, categories_limit=3, search_time_lim
 
     # update positions
     for name in set(iabs) - set(avg_iabs):
-        node = graph_with_pos_computed.node[name]
+        node = graph_with_pos_computed.nodes[name]
         node["pos"] = [node["pos"][0], node["pos"][1]-1.75]
 
     for name in ["averageBuyer"] + avg_iabs:
-        node = graph_with_pos_computed.node[name]
+        node = graph_with_pos_computed.nodes[name]
         node["pos"] = [node["pos"][0], node["pos"][1]+1.75]
 
-    node = graph_with_pos_computed.node["averageBuyer"]
+    node = graph_with_pos_computed.nodes["averageBuyer"]
     node["pos"] = [node["pos"][0], node["pos"][1]+1]
 
     drawing.draw(
